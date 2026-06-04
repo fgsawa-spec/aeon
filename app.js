@@ -118,18 +118,19 @@
 
     var products = getVisibleProducts();
     if (products.length === 0) {
-      body.appendChild(getEmptyRow());
+      body.appendChild(getEmptyRow(8));
       return;
     }
 
     products.forEach(function (product) {
       var row = document.createElement("tr");
       row.appendChild(createCell(product.productCode));
-      row.appendChild(createCell(product.color));
-      row.appendChild(createCell(product.name));
       row.appendChild(createCell(product.size));
-      row.appendChild(createCell(product.quantity, "number-cell"));
+      row.appendChild(createCell(product.name));
+      row.appendChild(createCell(product.color));
       row.appendChild(createCell(product.cartonSize, "number-cell"));
+      row.appendChild(createCell(product.quantity, "number-cell"));
+      row.appendChild(createCell(formatCartonRemainder(product), "number-cell"));
       row.appendChild(createActionsCell(product));
       body.appendChild(row);
     });
@@ -140,7 +141,7 @@
     body.innerHTML = "";
 
     if (state.movements.length === 0) {
-      body.appendChild(getEmptyRow());
+      body.appendChild(getEmptyRow(7));
       return;
     }
 
@@ -487,8 +488,18 @@
     return cell;
   }
 
-  function getEmptyRow() {
-    return document.getElementById("emptyRowTemplate").content.firstElementChild.cloneNode(true);
+  function getEmptyRow(colspan) {
+    var row = document.getElementById("emptyRowTemplate").content.firstElementChild.cloneNode(true);
+    row.firstElementChild.colSpan = colspan;
+    return row;
+  }
+
+  function formatCartonRemainder(product) {
+    var quantity = toInteger(product.quantity, 0);
+    var cartonSize = Math.max(1, toInteger(product.cartonSize, 1));
+    var cartons = Math.floor(quantity / cartonSize);
+    var remainder = quantity % cartonSize;
+    return cartons + "箱 / 余り" + remainder;
   }
 
   function normalizeProduct(product) {

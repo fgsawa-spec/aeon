@@ -122,11 +122,12 @@
             <thead>
               <tr>
                 <th><button class="sort-button" data-sort-key="productCode" type="button">品番</button></th>
-                <th><button class="sort-button" data-sort-key="color" type="button">色</button></th>
-                <th><button class="sort-button" data-sort-key="name" type="button">品名</button></th>
                 <th><button class="sort-button" data-sort-key="size" type="button">サイズ</button></th>
-                <th class="number-cell"><button class="sort-button" data-sort-key="quantity" type="button">数量</button></th>
+                <th><button class="sort-button" data-sort-key="name" type="button">品名</button></th>
+                <th><button class="sort-button" data-sort-key="color" type="button">色</button></th>
                 <th class="number-cell"><button class="sort-button" data-sort-key="cartonSize" type="button">入数</button></th>
+                <th class="number-cell"><button class="sort-button" data-sort-key="quantity" type="button">数量</button></th>
+                <th class="number-cell">カートン数/端数</th>
                 <th>操作</th>
               </tr>
             </thead>
@@ -161,7 +162,7 @@
 
     <template id="emptyRowTemplate">
       <tr>
-        <td class="empty-state" colspan="7">登録データがありません。</td>
+        <td class="empty-state">登録データがありません。</td>
       </tr>
     </template>
 
