@@ -71,51 +71,23 @@
             <button id="saveProductButton" class="primary-button wide" type="submit">商品を登録</button>
           </form>
         </div>
-
-        <div class="panel movement-panel">
-          <div class="panel-heading">
-            <h2>入出庫</h2>
-          </div>
-          <form id="movementForm" class="form-grid">
-            <label class="wide">
-              <span>商品</span>
-              <select id="movementProduct" required></select>
-            </label>
-            <div class="segmented wide" role="radiogroup" aria-label="入出庫種別">
-              <label>
-                <input type="radio" name="movementType" value="in" checked>
-                <span>入庫</span>
-              </label>
-              <label>
-                <input type="radio" name="movementType" value="out">
-                <span>出庫</span>
-              </label>
-            </div>
-            <label>
-              <span>数量</span>
-              <input id="movementQuantity" type="number" min="0" step="1" value="0">
-            </label>
-            <label>
-              <span>カートン数</span>
-              <input id="movementCartons" type="number" min="0" step="1" value="0">
-            </label>
-            <label class="wide">
-              <span>メモ</span>
-              <input id="movementMemo" type="text" autocomplete="off">
-            </label>
-            <p id="movementPreview" class="preview wide">換算数量: 0</p>
-            <button class="primary-button wide" type="submit">在庫へ反映</button>
-          </form>
-        </div>
       </section>
 
       <section class="list-section">
         <div class="section-heading">
           <h2>在庫一覧</h2>
+          <div class="inventory-actions">
+            <button id="bulkInButton" class="primary-button" type="button">入庫</button>
+            <button id="bulkOutButton" class="danger-button" type="button">出庫</button>
+            <button id="clearDraftButton" class="secondary-button" type="button">入力クリア</button>
+          </div>
+        </div>
+        <div class="section-tools">
           <label class="search-box">
             <span>検索</span>
             <input id="searchInput" type="search" placeholder="品番・品名・サイズ・色">
           </label>
+          <p id="draftSummary" class="preview">入力合計: 0</p>
         </div>
         <div class="table-wrap">
           <table>
@@ -128,6 +100,8 @@
                 <th class="number-cell"><button class="sort-button" data-sort-key="cartonSize" type="button">入数</button></th>
                 <th class="number-cell"><button class="sort-button" data-sort-key="quantity" type="button">数量</button></th>
                 <th class="number-cell">カートン数/端数</th>
+                <th class="number-cell">入出庫数量</th>
+                <th class="number-cell">入出庫カートン</th>
                 <th>操作</th>
               </tr>
             </thead>

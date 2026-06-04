@@ -2,32 +2,29 @@
   "use strict";
 
   var STORAGE_KEY = "aeonInventoryApp.v1";
+  var DRAFT_STORAGE_KEY = "aeonInventoryDrafts.v1";
   var state = loadState();
+  var movementDrafts = loadMovementDrafts();
   var sortState = { key: "default", direction: "asc" };
 
   var productForm = document.getElementById("productForm");
-  var movementForm = document.getElementById("movementForm");
   var importFile = document.getElementById("importFile");
   var searchInput = document.getElementById("searchInput");
   var productFormTitle = document.getElementById("productFormTitle");
   var saveProductButton = document.getElementById("saveProductButton");
   var cancelEditButton = document.getElementById("cancelEditButton");
-  var movementProduct = document.getElementById("movementProduct");
-  var movementQuantity = document.getElementById("movementQuantity");
-  var movementCartons = document.getElementById("movementCartons");
-  var movementPreview = document.getElementById("movementPreview");
+  var draftSummary = document.getElementById("draftSummary");
 
   productForm.addEventListener("submit", handleProductSubmit);
-  movementForm.addEventListener("submit", handleMovementSubmit);
   cancelEditButton.addEventListener("click", resetProductForm);
   document.getElementById("exportButton").addEventListener("click", exportJson);
   document.getElementById("clearDataButton").addEventListener("click", clearAllData);
   document.getElementById("clearHistoryButton").addEventListener("click", clearHistory);
+  document.getElementById("bulkInButton").addEventListener("click", function () { applyBulkMovement("in"); });
+  document.getElementById("bulkOutButton").addEventListener("click", function () { applyBulkMovement("out"); });
+  document.getElementById("clearDraftButton").addEventListener("click", clearMovementDrafts);
   importFile.addEventListener("change", importJson);
   searchInput.addEventListener("input", renderAll);
-  movementProduct.addEventListener("change", updateMovementPreview);
-  movementQuantity.addEventListener("input", updateMovementPreview);
-  movementCartons.addEventListener("input", updateMovementPreview);
 
   Array.prototype.forEach.call(document.querySelectorAll(".sort-button"), function (button) {
     button.addEventListener("click", function () {
@@ -66,12 +63,25 @@
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   }
 
+  function loadMovementDrafts() {
+    try {
+      var raw = localStorage.getItem(DRAFT_STORAGE_KEY);
+      var parsed = raw ? JSON.parse(raw) : {};
+      return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+    } catch (error) {
+      return {};
+    }
+  }
+
+  function saveMovementDrafts() {
+    localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(movementDrafts));
+  }
+
   function renderAll() {
     renderMetrics();
-    renderProductSelect();
     renderInventory();
     renderHistory();
-    updateMovementPreview();
+    updateDraftSummary();
   }
 
   function renderMetrics() {
@@ -84,32 +94,6 @@
     document.getElementById("movementCount").textContent = String(state.movements.length);
   }
 
-  function renderProductSelect() {
-    var selectedId = movementProduct.value;
-    movementProduct.innerHTML = "";
-
-    if (state.products.length === 0) {
-      var emptyOption = document.createElement("option");
-      emptyOption.value = "";
-      emptyOption.textContent = "商品を登録してください";
-      movementProduct.appendChild(emptyOption);
-      movementProduct.disabled = true;
-      return;
-    }
-
-    movementProduct.disabled = false;
-    getDefaultSortedProducts().forEach(function (product) {
-      var option = document.createElement("option");
-      option.value = product.id;
-      option.textContent = product.productCode + " / " + product.color + " / " + product.name + " / 在庫 " + product.quantity;
-      movementProduct.appendChild(option);
-    });
-
-    if (selectedId && state.products.some(function (product) { return product.id === selectedId; })) {
-      movementProduct.value = selectedId;
-    }
-  }
-
   function renderInventory() {
     var body = document.getElementById("inventoryBody");
     body.innerHTML = "";
@@ -118,7 +102,7 @@
 
     var products = getVisibleProducts();
     if (products.length === 0) {
-      body.appendChild(getEmptyRow(8));
+      body.appendChild(getEmptyRow(10));
       return;
     }
 
@@ -131,6 +115,8 @@
       row.appendChild(createCell(product.cartonSize, "number-cell"));
       row.appendChild(createCell(product.quantity, "number-cell"));
       row.appendChild(createCell(formatCartonRemainder(product), "number-cell"));
+      row.appendChild(createDraftInputCell(product, "quantity"));
+      row.appendChild(createDraftInputCell(product, "cartons"));
       row.appendChild(createActionsCell(product));
       body.appendChild(row);
     });
@@ -182,10 +168,6 @@
       var result = compareValue(a[sortState.key], b[sortState.key]);
       return sortState.direction === "asc" ? result : -result;
     });
-  }
-
-  function getDefaultSortedProducts() {
-    return state.products.slice().sort(defaultProductSort);
   }
 
   function defaultProductSort(a, b) {
@@ -279,58 +261,6 @@
     renderAll();
   }
 
-  function handleMovementSubmit(event) {
-    event.preventDefault();
-
-    var product = state.products.find(function (item) { return item.id === movementProduct.value; });
-    if (!product) {
-      alert("入出庫する商品を選択してください。");
-      return;
-    }
-
-    var type = document.querySelector("input[name='movementType']:checked").value;
-    var quantityInput = toInteger(movementQuantity.value, 0);
-    var cartons = toInteger(movementCartons.value, 0);
-    var convertedQuantity = cartons * toInteger(product.cartonSize, 1);
-    var totalQuantity = quantityInput + convertedQuantity;
-
-    if (quantityInput < 0 || cartons < 0) {
-      alert("数量とカートン数は0以上で入力してください。");
-      return;
-    }
-    if (totalQuantity <= 0) {
-      alert("数量またはカートン数を入力してください。");
-      return;
-    }
-    if (type === "out" && product.quantity < totalQuantity) {
-      alert("在庫が不足しています。現在庫: " + product.quantity + " / 出庫数量: " + totalQuantity);
-      return;
-    }
-
-    product.quantity = type === "in" ? product.quantity + totalQuantity : product.quantity - totalQuantity;
-    product.updatedAt = new Date().toISOString();
-
-    state.movements.push({
-      id: createId("movement"),
-      productId: product.id,
-      type: type,
-      productCode: product.productCode,
-      productName: product.name,
-      productColor: product.color,
-      productSize: product.size,
-      quantity: totalQuantity,
-      cartons: cartons,
-      cartonSizeAtTime: product.cartonSize,
-      memo: document.getElementById("movementMemo").value.trim(),
-      createdAt: new Date().toISOString()
-    });
-
-    saveState();
-    movementForm.reset();
-    document.querySelector("input[name='movementType'][value='in']").checked = true;
-    renderAll();
-  }
-
   function editProduct(id) {
     var product = state.products.find(function (item) { return item.id === id; });
     if (!product) {
@@ -360,7 +290,9 @@
     }
 
     state.products = state.products.filter(function (item) { return item.id !== id; });
+    delete movementDrafts[id];
     saveState();
+    saveMovementDrafts();
     renderAll();
   }
 
@@ -372,14 +304,6 @@
     productFormTitle.textContent = "商品登録";
     saveProductButton.textContent = "商品を登録";
     cancelEditButton.classList.add("hidden");
-  }
-
-  function updateMovementPreview() {
-    var product = state.products.find(function (item) { return item.id === movementProduct.value; });
-    var cartonSize = product ? toInteger(product.cartonSize, 1) : 1;
-    var quantity = toInteger(movementQuantity.value, 0);
-    var cartons = toInteger(movementCartons.value, 0);
-    movementPreview.textContent = "換算数量: " + (quantity + cartons * cartonSize);
   }
 
   function exportJson() {
@@ -421,7 +345,9 @@
           products: parsed.products.map(normalizeProduct),
           movements: parsed.movements.map(normalizeMovement)
         };
+        movementDrafts = {};
         saveState();
+        saveMovementDrafts();
         resetProductForm();
         importFile.value = "";
         renderAll();
@@ -438,7 +364,9 @@
       return;
     }
     state = { products: [], movements: [] };
+    movementDrafts = {};
     saveState();
+    saveMovementDrafts();
     resetProductForm();
     renderAll();
   }
@@ -450,6 +378,115 @@
     state.movements = [];
     saveState();
     renderAll();
+  }
+
+  function applyBulkMovement(type) {
+    var entries = state.products.map(function (product) {
+      var draft = getMovementDraft(product.id);
+      var quantityInput = Math.max(0, toInteger(draft.quantity, 0));
+      var cartons = Math.max(0, toInteger(draft.cartons, 0));
+      var totalQuantity = quantityInput + cartons * Math.max(1, toInteger(product.cartonSize, 1));
+      return {
+        product: product,
+        quantityInput: quantityInput,
+        cartons: cartons,
+        totalQuantity: totalQuantity
+      };
+    }).filter(function (entry) {
+      return entry.totalQuantity > 0;
+    });
+
+    if (entries.length === 0) {
+      alert("入出庫する数量またはカートン数を入力してください。");
+      return;
+    }
+
+    if (type === "out") {
+      var shortage = entries.find(function (entry) {
+        return entry.product.quantity < entry.totalQuantity;
+      });
+      if (shortage) {
+        alert(
+          "在庫が不足しています。\n" +
+          shortage.product.productCode + " / " + shortage.product.name +
+          "\n現在庫: " + shortage.product.quantity +
+          "\n出庫数量: " + shortage.totalQuantity
+        );
+        return;
+      }
+    }
+
+    var createdAt = new Date().toISOString();
+    entries.forEach(function (entry) {
+      var product = entry.product;
+      product.quantity = type === "in" ? product.quantity + entry.totalQuantity : product.quantity - entry.totalQuantity;
+      product.updatedAt = createdAt;
+      state.movements.push({
+        id: createId("movement"),
+        productId: product.id,
+        type: type,
+        productCode: product.productCode,
+        productName: product.name,
+        productColor: product.color,
+        productSize: product.size,
+        quantity: entry.totalQuantity,
+        cartons: entry.cartons,
+        cartonSizeAtTime: product.cartonSize,
+        memo: "一覧一括" + (type === "in" ? "入庫" : "出庫"),
+        createdAt: createdAt
+      });
+      delete movementDrafts[product.id];
+    });
+
+    saveState();
+    saveMovementDrafts();
+    renderAll();
+  }
+
+  function clearMovementDrafts() {
+    var hasDraft = Object.keys(movementDrafts).some(function (productId) {
+      var draft = getMovementDraft(productId);
+      return toInteger(draft.quantity, 0) > 0 || toInteger(draft.cartons, 0) > 0;
+    });
+    if (!hasDraft) {
+      return;
+    }
+    if (!confirm("入力中の入出庫数量をすべて消しますか？")) {
+      return;
+    }
+    movementDrafts = {};
+    saveMovementDrafts();
+    renderInventory();
+    updateDraftSummary();
+  }
+
+  function getMovementDraft(productId) {
+    var draft = movementDrafts[productId];
+    return draft && typeof draft === "object" ? draft : { quantity: "", cartons: "" };
+  }
+
+  function updateMovementDraft(productId, field, value) {
+    var draft = movementDrafts[productId];
+    if (!draft || typeof draft !== "object") {
+      draft = { quantity: "", cartons: "" };
+      movementDrafts[productId] = draft;
+    }
+    draft[field] = value;
+    if (toInteger(draft.quantity, 0) <= 0 && toInteger(draft.cartons, 0) <= 0) {
+      delete movementDrafts[productId];
+    }
+    saveMovementDrafts();
+    updateDraftSummary();
+  }
+
+  function updateDraftSummary() {
+    var total = state.products.reduce(function (sum, product) {
+      var draft = getMovementDraft(product.id);
+      var quantity = Math.max(0, toInteger(draft.quantity, 0));
+      var cartons = Math.max(0, toInteger(draft.cartons, 0));
+      return sum + quantity + cartons * Math.max(1, toInteger(product.cartonSize, 1));
+    }, 0);
+    draftSummary.textContent = "入力合計: " + total;
   }
 
   function createActionsCell(product) {
@@ -476,6 +513,25 @@
     actions.appendChild(editButton);
     actions.appendChild(deleteButton);
     cell.appendChild(actions);
+    return cell;
+  }
+
+  function createDraftInputCell(product, field) {
+    var cell = document.createElement("td");
+    cell.className = "number-cell";
+    var input = document.createElement("input");
+    input.className = "movement-input";
+    input.type = "number";
+    input.min = "0";
+    input.step = "1";
+    input.inputMode = "numeric";
+    input.value = getMovementDraft(product.id)[field] || "";
+    input.dataset.productId = product.id;
+    input.dataset.field = field;
+    input.addEventListener("input", function () {
+      updateMovementDraft(product.id, field, input.value);
+    });
+    cell.appendChild(input);
     return cell;
   }
 

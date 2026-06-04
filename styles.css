@@ -112,7 +112,7 @@ h2 {
 
 .workspace {
   display: grid;
-  grid-template-columns: minmax(0, 1.15fr) minmax(320px, 0.85fr);
+  grid-template-columns: 1fr;
   gap: 16px;
   align-items: start;
 }
@@ -273,6 +273,28 @@ select:focus {
   width: min(360px, 100%);
 }
 
+.section-tools {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.inventory-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.movement-input {
+  max-width: 100px;
+  min-height: 36px;
+  padding: 6px 8px;
+  text-align: right;
+}
+
 .table-wrap {
   width: 100%;
   overflow-x: auto;
@@ -282,7 +304,7 @@ select:focus {
 
 table {
   width: 100%;
-  min-width: 940px;
+  min-width: 1140px;
   border-collapse: collapse;
   background: #fff;
 }
@@ -370,7 +392,8 @@ tr:last-child td {
 
 @media (max-width: 860px) {
   .app-header,
-  .section-heading {
+  .section-heading,
+  .section-tools {
     align-items: stretch;
     flex-direction: column;
   }
@@ -392,5 +415,9 @@ tr:last-child td {
 
   .search-box {
     width: 100%;
+  }
+
+  .inventory-actions {
+    justify-content: flex-start;
   }
 }
