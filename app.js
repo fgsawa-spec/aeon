@@ -20,11 +20,16 @@
   document.getElementById("exportButton").addEventListener("click", exportJson);
   document.getElementById("clearDataButton").addEventListener("click", clearAllData);
   document.getElementById("clearHistoryButton").addEventListener("click", clearHistory);
-  document.getElementById("bulkInButton").addEventListener("click", function () { applyBulkMovement("in"); });
-  document.getElementById("bulkOutButton").addEventListener("click", function () { applyBulkMovement("out"); });
+  document.getElementById("applyMovementButton").addEventListener("click", applyBulkMovement);
   document.getElementById("clearDraftButton").addEventListener("click", clearMovementDrafts);
   importFile.addEventListener("change", importJson);
   searchInput.addEventListener("input", renderAll);
+
+  Array.prototype.forEach.call(document.querySelectorAll("input[name='bulkMovementType']"), function (input) {
+    input.addEventListener("change", function () {
+      applyMovementTypeToVisibleProducts(input.value);
+    });
+  });
 
   Array.prototype.forEach.call(document.querySelectorAll(".sort-button"), function (button) {
     button.addEventListener("click", function () {
@@ -102,7 +107,7 @@
 
     var products = getVisibleProducts();
     if (products.length === 0) {
-      body.appendChild(getEmptyRow(10));
+      body.appendChild(getEmptyRow(11));
       return;
     }
 
@@ -115,6 +120,7 @@
       row.appendChild(createCell(product.cartonSize, "number-cell"));
       row.appendChild(createCell(product.quantity, "number-cell"));
       row.appendChild(createCell(formatCartonRemainder(product), "number-cell"));
+      row.appendChild(createMovementTypeCell(product));
       row.appendChild(createDraftInputCell(product, "quantity"));
       row.appendChild(createDraftInputCell(product, "cartons"));
       row.appendChild(createActionsCell(product));
@@ -380,7 +386,7 @@
     renderAll();
   }
 
-  function applyBulkMovement(type) {
+  function applyBulkMovement() {
     var entries = state.products.map(function (product) {
       var draft = getMovementDraft(product.id);
       var quantityInput = Math.max(0, toInteger(draft.quantity, 0));
@@ -390,7 +396,8 @@
         product: product,
         quantityInput: quantityInput,
         cartons: cartons,
-        totalQuantity: totalQuantity
+        totalQuantity: totalQuantity,
+        type: draft.type || ""
       };
     }).filter(function (entry) {
       return entry.totalQuantity > 0;
@@ -401,9 +408,23 @@
       return;
     }
 
-    if (type === "out") {
+    var missingType = entries.find(function (entry) {
+      return entry.type !== "in" && entry.type !== "out";
+    });
+    if (missingType) {
+      alert(
+        "入庫または出庫を選択してください。\n" +
+        missingType.product.productCode + " / " + missingType.product.name
+      );
+      return;
+    }
+
+    var outEntries = entries.filter(function (entry) {
+      return entry.type === "out";
+    });
+    if (outEntries.length > 0) {
       var shortage = entries.find(function (entry) {
-        return entry.product.quantity < entry.totalQuantity;
+        return entry.type === "out" && entry.product.quantity < entry.totalQuantity;
       });
       if (shortage) {
         alert(
@@ -419,12 +440,12 @@
     var createdAt = new Date().toISOString();
     entries.forEach(function (entry) {
       var product = entry.product;
-      product.quantity = type === "in" ? product.quantity + entry.totalQuantity : product.quantity - entry.totalQuantity;
+      product.quantity = entry.type === "in" ? product.quantity + entry.totalQuantity : product.quantity - entry.totalQuantity;
       product.updatedAt = createdAt;
       state.movements.push({
         id: createId("movement"),
         productId: product.id,
-        type: type,
+        type: entry.type,
         productCode: product.productCode,
         productName: product.name,
         productColor: product.color,
@@ -432,7 +453,7 @@
         quantity: entry.totalQuantity,
         cartons: entry.cartons,
         cartonSizeAtTime: product.cartonSize,
-        memo: "一覧一括" + (type === "in" ? "入庫" : "出庫"),
+        memo: "一覧一括" + (entry.type === "in" ? "入庫" : "出庫"),
         createdAt: createdAt
       });
       delete movementDrafts[product.id];
@@ -443,10 +464,25 @@
     renderAll();
   }
 
+  function applyMovementTypeToVisibleProducts(type) {
+    getVisibleProducts().forEach(function (product) {
+      var draft = movementDrafts[product.id];
+      if (!draft || typeof draft !== "object") {
+        draft = { quantity: "", cartons: "", type: "" };
+        movementDrafts[product.id] = draft;
+      }
+      draft.type = type;
+    });
+    saveMovementDrafts();
+    renderInventory();
+    updateDraftSummary();
+    clearBulkMovementTypeSelection();
+  }
+
   function clearMovementDrafts() {
     var hasDraft = Object.keys(movementDrafts).some(function (productId) {
       var draft = getMovementDraft(productId);
-      return toInteger(draft.quantity, 0) > 0 || toInteger(draft.cartons, 0) > 0;
+      return toInteger(draft.quantity, 0) > 0 || toInteger(draft.cartons, 0) > 0 || draft.type;
     });
     if (!hasDraft) {
       return;
@@ -462,17 +498,17 @@
 
   function getMovementDraft(productId) {
     var draft = movementDrafts[productId];
-    return draft && typeof draft === "object" ? draft : { quantity: "", cartons: "" };
+    return draft && typeof draft === "object" ? draft : { quantity: "", cartons: "", type: "" };
   }
 
   function updateMovementDraft(productId, field, value) {
     var draft = movementDrafts[productId];
     if (!draft || typeof draft !== "object") {
-      draft = { quantity: "", cartons: "" };
+      draft = { quantity: "", cartons: "", type: "" };
       movementDrafts[productId] = draft;
     }
     draft[field] = value;
-    if (toInteger(draft.quantity, 0) <= 0 && toInteger(draft.cartons, 0) <= 0) {
+    if (toInteger(draft.quantity, 0) <= 0 && toInteger(draft.cartons, 0) <= 0 && !draft.type) {
       delete movementDrafts[productId];
     }
     saveMovementDrafts();
@@ -480,13 +516,44 @@
   }
 
   function updateDraftSummary() {
-    var total = state.products.reduce(function (sum, product) {
+    var totals = state.products.reduce(function (summary, product) {
       var draft = getMovementDraft(product.id);
       var quantity = Math.max(0, toInteger(draft.quantity, 0));
       var cartons = Math.max(0, toInteger(draft.cartons, 0));
-      return sum + quantity + cartons * Math.max(1, toInteger(product.cartonSize, 1));
-    }, 0);
-    draftSummary.textContent = "入力合計: " + total;
+      var total = quantity + cartons * Math.max(1, toInteger(product.cartonSize, 1));
+      if (total <= 0) {
+        return summary;
+      }
+      if (draft.type === "in") {
+        summary.in += total;
+      } else if (draft.type === "out") {
+        summary.out += total;
+      } else {
+        summary.blank += total;
+      }
+      return summary;
+    }, { in: 0, out: 0, blank: 0 });
+    draftSummary.textContent = "入力合計: 入庫 " + totals.in + " / 出庫 " + totals.out + " / 区分未選択 " + totals.blank;
+  }
+
+  function updateMovementType(productId, type) {
+    var draft = movementDrafts[productId];
+    if (!draft || typeof draft !== "object") {
+      draft = { quantity: "", cartons: "", type: "" };
+      movementDrafts[productId] = draft;
+    }
+    draft.type = type;
+    if (toInteger(draft.quantity, 0) <= 0 && toInteger(draft.cartons, 0) <= 0 && !draft.type) {
+      delete movementDrafts[productId];
+    }
+    saveMovementDrafts();
+    updateDraftSummary();
+  }
+
+  function clearBulkMovementTypeSelection() {
+    Array.prototype.forEach.call(document.querySelectorAll("input[name='bulkMovementType']"), function (input) {
+      input.checked = false;
+    });
   }
 
   function createActionsCell(product) {
@@ -513,6 +580,31 @@
     actions.appendChild(editButton);
     actions.appendChild(deleteButton);
     cell.appendChild(actions);
+    return cell;
+  }
+
+  function createMovementTypeCell(product) {
+    var cell = document.createElement("td");
+    var wrap = document.createElement("div");
+    var draft = getMovementDraft(product.id);
+    wrap.className = "row-type-control";
+
+    ["in", "out"].forEach(function (type) {
+      var label = document.createElement("label");
+      var input = document.createElement("input");
+      input.type = "radio";
+      input.name = "movementType-" + product.id;
+      input.value = type;
+      input.checked = draft.type === type;
+      input.addEventListener("change", function () {
+        updateMovementType(product.id, type);
+      });
+      label.appendChild(input);
+      label.appendChild(document.createTextNode(type === "in" ? "入庫" : "出庫"));
+      wrap.appendChild(label);
+    });
+
+    cell.appendChild(wrap);
     return cell;
   }
 

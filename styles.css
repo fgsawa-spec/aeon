@@ -288,6 +288,45 @@ select:focus {
   gap: 8px;
 }
 
+.bulk-type-control,
+.row-type-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.bulk-type-control {
+  min-height: 40px;
+  padding: 6px 10px;
+  background: var(--surface-strong);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+
+.bulk-type-control span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.bulk-type-control label,
+.row-type-control label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.bulk-type-control input,
+.row-type-control input {
+  width: 16px;
+  min-height: 16px;
+  margin: 0;
+}
+
 .movement-input {
   max-width: 100px;
   min-height: 36px;
@@ -304,7 +343,7 @@ select:focus {
 
 table {
   width: 100%;
-  min-width: 1140px;
+  min-width: 1240px;
   border-collapse: collapse;
   background: #fff;
 }

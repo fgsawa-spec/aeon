@@ -77,8 +77,18 @@
         <div class="section-heading">
           <h2>在庫一覧</h2>
           <div class="inventory-actions">
-            <button id="bulkInButton" class="primary-button" type="button">入庫</button>
-            <button id="bulkOutButton" class="danger-button" type="button">出庫</button>
+            <div class="bulk-type-control" aria-label="表示中リストの入出庫区分を一括選択">
+              <span>一括選択</span>
+              <label>
+                <input type="radio" name="bulkMovementType" value="in">
+                入庫
+              </label>
+              <label>
+                <input type="radio" name="bulkMovementType" value="out">
+                出庫
+              </label>
+            </div>
+            <button id="applyMovementButton" class="primary-button" type="button">適用</button>
             <button id="clearDraftButton" class="secondary-button" type="button">入力クリア</button>
           </div>
         </div>
@@ -100,6 +110,7 @@
                 <th class="number-cell"><button class="sort-button" data-sort-key="cartonSize" type="button">入数</button></th>
                 <th class="number-cell"><button class="sort-button" data-sort-key="quantity" type="button">数量</button></th>
                 <th class="number-cell">カートン数/端数</th>
+                <th>区分</th>
                 <th class="number-cell">入出庫数量</th>
                 <th class="number-cell">入出庫カートン</th>
                 <th>操作</th>
