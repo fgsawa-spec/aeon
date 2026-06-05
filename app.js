@@ -531,8 +531,31 @@
     input.addEventListener("input", function () {
       updateMovementDraft(product.id, field, input.value);
     });
+    input.addEventListener("keydown", function (event) {
+      handleDraftInputKeydown(event, input);
+    });
     cell.appendChild(input);
     return cell;
+  }
+
+  function handleDraftInputKeydown(event, input) {
+    if (event.key !== "ArrowUp" && event.key !== "ArrowDown") {
+      return;
+    }
+
+    var inputs = Array.prototype.slice.call(
+      document.querySelectorAll(".movement-input[data-field='" + input.dataset.field + "']")
+    );
+    var currentIndex = inputs.indexOf(input);
+    var nextIndex = event.key === "ArrowUp" ? currentIndex - 1 : currentIndex + 1;
+
+    if (nextIndex < 0 || nextIndex >= inputs.length) {
+      return;
+    }
+
+    event.preventDefault();
+    inputs[nextIndex].focus();
+    inputs[nextIndex].select();
   }
 
   function createCell(value, className) {
